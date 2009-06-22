@@ -2584,11 +2584,11 @@ Strophe.Connection.prototype = {
 
         for (i = 0; i < elem.childNodes.length; i++) {
             child = elem.childNodes[i];
-            if (child.nodeName == 'bind') {
+            if (child.nodeName.toLowerCase() == 'bind') {
                 this.do_bind = true;
             }
 
-            if (child.nodeName == 'session') {
+            if (child.nodeName.toLowerCase() == 'session') {
                 this.do_session = true;
             }
         }
