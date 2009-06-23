@@ -1705,7 +1705,7 @@ Strophe.TimedHandler.prototype = {
  *    (Integer) sends - The number of times this same request has been
  *      sent.
  */
-Strophe.Request = function (elem, func, rid, sends)
+Strophe.Request = function (elem, func, rid, sends, target_window)
 {
     this.id = ++Strophe._requestId;
     this.xmlData = elem;
@@ -1729,7 +1729,7 @@ Strophe.Request = function (elem, func, rid, sends)
         var now = new Date();
         return (now - this.dead) / 1000;
     };
-    this.xhr = this._newXHR();
+    this.xhr = this._newXHR(target_window);
 };
 
 Strophe.Request.prototype = {
@@ -1775,16 +1775,16 @@ Strophe.Request.prototype = {
      *  Returns:
      *    A new XMLHttpRequest.
      */
-    _newXHR: function ()
+    _newXHR: function (target_window)
     {
         var xhr = null;
-        if (window.XMLHttpRequest) {
-            xhr = new XMLHttpRequest();
+        if (target_window.XMLHttpRequest) {
+            xhr = new target_window.XMLHttpRequest();
             if (xhr.overrideMimeType) {
                 xhr.overrideMimeType("text/xml");
             }
-        } else if (window.ActiveXObject) {
-            xhr = new ActiveXObject("Microsoft.XMLHTTP");
+        } else if (target_window.ActiveXObject) {
+            xhr = new target_window.ActiveXObject("Microsoft.XMLHTTP");
         }
 
         xhr.onreadystatechange = this.func.prependArg(this);
@@ -1824,8 +1824,9 @@ Strophe.Request.prototype = {
  *  Returns:
  *    A new Strophe.Connection object.
  */
-Strophe.Connection = function (service)
+Strophe.Connection = function (service, target_window)
 {
+    this.target_window = target_window || window
     /* The path to the httpbind service. */
     this.service = service;
     /* The connected JID. */
@@ -2032,7 +2033,7 @@ Strophe.Connection.prototype = {
             new Strophe.Request(body.tree(),
                                 this._onRequestStateChange.bind(this)
                                     .prependArg(this._connect_cb.bind(this)),
-                                body.tree().getAttribute("rid")));
+                                body.tree().getAttribute("rid"),null,this.target_window));
         this._throttledRequestHandler();
 
 	// setup onIdle callback every 1/10th of a second
@@ -2441,7 +2442,8 @@ Strophe.Connection.prototype = {
             this._requests[i] = new Strophe.Request(req.xmlData,
                                                     req.origFunc,
                                                     req.rid,
-                                                    req.sends);
+                                                    req.sends,
+						    this.target_window);
             req = this._requests[i];
         }
 
@@ -2784,7 +2786,7 @@ Strophe.Connection.prototype = {
         var req = new Strophe.Request(body.tree(),
                                       this._onRequestStateChange.bind(this)
                                           .prependArg(this._dataRecv.bind(this)),
-                                      body.tree().getAttribute("rid"));
+                                      body.tree().getAttribute("rid"),null,this.target_window);
 
         // abort and clear all waiting requests
         var r;
@@ -3145,11 +3147,11 @@ Strophe.Connection.prototype = {
 
         for (i = 0; i < elem.childNodes.length; i++) {
             child = elem.childNodes[i];
-            if (child.nodeName == 'bind') {
+            if (child.nodeName.toLowerCase() == 'bind') {
                 this.do_bind = true;
             }
 
-            if (child.nodeName == 'session') {
+            if (child.nodeName.toLowerCase() == 'session') {
                 this.do_session = true;
             }
         }
@@ -3435,7 +3437,7 @@ Strophe.Connection.prototype = {
                 new Strophe.Request(body.tree(),
                                     this._onRequestStateChange.bind(this)
                                     .prependArg(this._dataRecv.bind(this)),
-                                    body.tree().getAttribute("rid")));
+                                    body.tree().getAttribute("rid"),null,this.target_window));
             this._processRequest(this._requests.length - 1);
         }
 
