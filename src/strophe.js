@@ -1890,6 +1890,8 @@ Strophe.Connection.prototype = {
             this._disconnectTimeout = this._addSysTimedHandler(
                 3000, this._onDisconnectTimeout.bind(this));
             this._sendTerminate();
+        } else {
+          this.disconnecting = true;
         }
     },
 
@@ -2020,7 +2022,7 @@ Strophe.Connection.prototype = {
                 Strophe.error("XHR open failed.");
                 if (!this.connected)
                     this.connect_callback(Strophe.Status.CONNFAIL,
-                                          "bad-service");
+                                          "bad-service: " + e);
                 this.disconnect();
                 return;
             }
