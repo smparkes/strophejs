@@ -112,6 +112,14 @@ if (!Array.prototype.indexOf)
     };
 }
 
+/* All of the Strophe globals are defined in this special function below so
+ * that references to the globals become closures.  This will ensure that
+ * on page reload, these references will still be available to callbacks
+ * that are still executing.
+ */
+ 
+(function (callback) {
+var Strophe;
 
 /** Function: $build
  *  Create a Strophe.Builder.
@@ -326,6 +334,30 @@ Strophe = {
         return el.tagName.toLowerCase() == name.toLowerCase();
     },
 
+    /** PrivateVariable: _xmlGenerator
+     *  _Private_ variable that caches a DOM document to
+     *  generate elements.
+     */
+    _xmlGenerator: null,
+
+    /** PrivateFunction: _makeGenerator
+     *  _Private_ function that creates a dummy XML DOM document to serve as
+     *  an element and text node generator.
+     */
+    _makeGenerator: function () {
+        var doc;
+
+        if (window.ActiveXObject) {
+            doc = new ActiveXObject("Microsoft.XMLDOM");
+            doc.appendChild(doc.createElement('strophe'));
+        } else {
+            doc = document.implementation
+                .createDocument('jabber:client', 'strophe', null);
+        }
+
+        return doc;
+    },
+
     /** Function: xmlElement
      *  Create an XML DOM element.
      *
@@ -353,24 +385,17 @@ Strophe = {
      */
     xmlElement: function (name)
     {
-        // FIXME: this should also support attrs argument in object notation
         if (!name) { return null; }
 
         var node = null;
-        if (window.ActiveXObject) {
-            node = new ActiveXObject("Microsoft.XMLDOM").createElement(name);
-        } else {
-            node = document.createElement(name);
+        if (!Strophe._xmlGenerator) {
+            Strophe._xmlGenerator = Strophe._makeGenerator();
         }
-        // use node._realname to store the case-sensitive version of the tag
-        // name, since some browsers will force tagnames to all lowercase.
-        // this is needed for the <vCard/> tag in XMPP specifically.
-        if (node.tagName != name)
-            node.setAttribute("_realname", name);
+        node = Strophe._xmlGenerator.createElement(name);
 
         // FIXME: this should throw errors if args are the wrong type or
         // there are more than two optional args
-        var a, i;
+        var a, i, k;
         for (a = 1; a < arguments.length; a++) {
             if (!arguments[a]) { continue; }
             if (typeof(arguments[a]) == "string" ||
@@ -385,11 +410,18 @@ Strophe = {
                                           arguments[a][i][1]);
                     }
                 }
+            } else if (typeof(arguments[a]) == "object") {
+                for (k in arguments[a]) {
+                    if (arguments[a].hasOwnProperty(k)) {
+                        node.setAttribute(k, arguments[a][k]);
+                    }
+                } 
             }
         }
 
         return node;
     },
+
     /*  Function: xmlescape
      *  Excapes invalid xml characters.
      *
@@ -406,6 +438,7 @@ Strophe = {
         text = text.replace(/>/g,  "&gt;");
         return text;    
     },
+
     /** Function: xmlTextNode
      *  Creates an XML DOM text node.
      *
@@ -421,11 +454,11 @@ Strophe = {
     {
 	//ensure text is escaped
 	text = Strophe.xmlescape(text);
-        if (window.ActiveXObject) {
-            return new ActiveXObject("Microsoft.XMLDOM").createTextNode(text);
-        } else {
-            return document.createTextNode(text);
+
+        if (!Strophe._xmlGenerator) {
+            Strophe._xmlGenerator = Strophe._makeGenerator();
         }
+        return Strophe._xmlGenerator.createTextNode(text);
     },
 
     /** Function: getText
@@ -489,25 +522,18 @@ Strophe = {
         return el;
     },
 
-    /** Function: escapeJid
-     *  Escape a JID.
+    /** Function: escapeNode
+     *  Escape the node part (also called local part) of a JID.
      *
      *  Parameters:
-     *    (String) jid - A JID.
+     *    (String) node - A node (or local part).
      *
      *  Returns:
-     *    An escaped JID String.
+     *    An escaped node (or local part).
      */
-    escapeJid: function (jid)
+    escapeNode: function (node)
     {
-        var user = jid.split("@");
-        if (user.length == 1)
-            // no user so nothing to escape
-            return jid;
-
-        var host = user.splice(user.length - 1, 1)[0];
-        user = user.join("@")
-            .replace(/^\s+|\s+$/g, '')
+        return node.replace(/^\s+|\s+$/g, '')
             .replace(/\\/g,  "\\5c")
             .replace(/ /g,   "\\20")
             .replace(/\"/g,  "\\22")
@@ -518,22 +544,20 @@ Strophe = {
             .replace(/</g,   "\\3c")
             .replace(/>/g,   "\\3e")
             .replace(/@/g,   "\\40");
-
-        return [user, host].join("@");
     },
 
-    /** Function: unescapeJid
-     *  Unescape a JID.
+    /** Function: unescapeNode
+     *  Unescape a node part (also called local part) of a JID.
      *
      *  Parameters:
-     *    (String) jid - A JID.
+     *    (String) node - A node (or local part).
      *
      *  Returns:
-     *    An unescaped JID String.
+     *    An unescaped node (or local part).
      */
-    unescapeJid: function (jid)
+    unescapeNode: function (node)
     {
-        return jid.replace(/\\20/g, " ")
+        return node.replace(/\\20/g, " ")
             .replace(/\\22/g, '"')
             .replace(/\\26/g, "&")
             .replace(/\\27/g, "'")
@@ -558,7 +582,7 @@ Strophe = {
     {
         if (jid.indexOf("@") < 0)
             return null;
-        return Strophe.escapeJid(jid).split("@")[0];
+        return jid.split("@")[0];
     },
 
     /** Function: getDomainFromJid
@@ -572,11 +596,14 @@ Strophe = {
      */
     getDomainFromJid: function (jid)
     {
-        var bare = Strophe.escapeJid(Strophe.getBareJidFromJid(jid));
-        if (bare.indexOf("@") < 0)
+        var bare = Strophe.getBareJidFromJid(jid);
+        if (bare.indexOf("@") < 0) {
             return bare;
-        else
-            return bare.split("@")[1];
+        } else {
+            var parts = bare.split("@");
+            parts.splice(0, 1);
+            return parts.join('@');
+        }
     },
 
     /** Function: getResourceFromJid
@@ -590,9 +617,10 @@ Strophe = {
      */
     getResourceFromJid: function (jid)
     {
-        var s = Strophe.escapeJid(jid).split("/");
+        var s = jid.split("/");
         if (s.length < 2) return null;
-        return s[1];
+        s.splice(0, 1);
+        return s.join('/');
     },
 
     /** Function: getBareJidFromJid
@@ -606,7 +634,7 @@ Strophe = {
      */
     getBareJidFromJid: function (jid)
     {
-        return this.escapeJid(jid).split("/")[0];
+        return jid.split("/")[0];
     },
 
     /** Function: log
@@ -830,7 +858,7 @@ Strophe.Builder = function (name, attrs)
     }
 
     // Holds the tree being built.
-    this.nodeTree = this._makeNode(name, attrs);
+    this.nodeTree = Strophe.xmlElement(name, attrs);
 
     // Points to the current operation node.
     this.node = this.nodeTree;
@@ -918,7 +946,7 @@ Strophe.Builder.prototype = {
      */
     c: function (name, attrs)
     {
-        var child = this._makeNode(name, attrs);
+        var child = Strophe.xmlElement(name, attrs);
         this.node.appendChild(child);
         this.node = child;
         return this;
@@ -962,25 +990,6 @@ Strophe.Builder.prototype = {
         var child = Strophe.xmlTextNode(text);
         this.node.appendChild(child);
         return this;
-    },
-
-    /** PrivateFunction: _makeNode
-     *  _Private_ helper function to create a DOM element.
-     *
-     *  Parameters:
-     *    (String) name - The name of the new element.
-     *    (Object) attrs - The attributes for the new element in object
-     *      notation.
-     *
-     *  Returns:
-     *    A new DOM element.
-     */
-    _makeNode: function (name, attrs)
-    {
-        var node = Strophe.xmlElement(name);
-        for (var k in attrs)
-            node.setAttribute(k, attrs[k]);
-        return node;
     }
 };
 
@@ -1717,9 +1726,13 @@ Strophe.Connection.prototype = {
 
             var iqtype = stanza.getAttribute('type');
 	    if (iqtype === 'result') {
-		callback(stanza);
+		if (callback) {
+                    callback(stanza);
+                }
 	    } else if (iqtype === 'error') {
-		errback(stanza);
+		if (errback) {
+                    errback(stanza);
+                }
 	    } else {
                 throw {
                     name: "StropheError",
@@ -1735,7 +1748,9 @@ Strophe.Connection.prototype = {
                 that.deleteHandler(handler);
 
 	        // call errback on timeout with null stanza
-		errback(null);
+                if (errback) {
+		    errback(null);
+                }
 		return false;
 	    });
 	}
@@ -2449,8 +2464,14 @@ Strophe.Connection.prototype = {
             return;
         }
 
-        this.sid = bodyWrap.getAttribute("sid");
-        this.stream_id = bodyWrap.getAttribute("authid");
+        // check to make sure we don't overwrite these if _connect_cb is
+        // called multiple times in the case of missing stream:features
+        if (!this.sid) {
+            this.sid = bodyWrap.getAttribute("sid");
+        }
+        if (!this.stream_id) {
+            this.stream_id = bodyWrap.getAttribute("authid");
+        }
 
         // TODO - add SASL anonymous for guest accounts
         var do_sasl_plain = false;
@@ -2470,6 +2491,17 @@ Strophe.Connection.prototype = {
                     do_sasl_anonymous = true;
                 }
             }
+        } else {
+            // we didn't get stream:features yet, so we need wait for it
+            // by sending a blank poll request
+            var body = this._buildBody();
+            this._requests.push(
+                new Strophe.Request(body.tree(),
+                                    this._onRequestStateChange.bind(this)
+                                      .prependArg(this._connect_cb.bind(this)),
+                                    body.tree().getAttribute("rid")));
+            this._throttledRequestHandler();
+            return;
         }
 
         if (Strophe.getNodeFromJid(this.jid) === null &&
@@ -2508,8 +2540,7 @@ Strophe.Connection.prototype = {
         } else if (do_sasl_plain) {
             // Build the plain auth string (barejid null
             // username null password) and base 64 encoded.
-            auth_str = Strophe.escapeJid(
-                Strophe.getBareJidFromJid(this.jid));
+            auth_str = Strophe.getBareJidFromJid(this.jid);
             auth_str = auth_str + "\u0000";
             auth_str = auth_str + Strophe.getNodeFromJid(this.jid);
             auth_str = auth_str + "\u0000";
@@ -2598,18 +2629,18 @@ Strophe.Connection.prototype = {
         var A2 = 'AUTHENTICATE:' + digest_uri;
 
         var responseText = "";
-        responseText += 'username="' +
-            Strophe.getNodeFromJid(this.jid) + '",';
-        responseText += 'realm="' + realm + '",';
-        responseText += 'nonce="' + nonce + '",';
-        responseText += 'cnonce="' + cnonce + '",';
+        responseText += 'username=' +
+            this._quote(Strophe.getNodeFromJid(this.jid)) + ',';
+        responseText += 'realm=' + this._quote(realm) + ',';
+        responseText += 'nonce=' + this._quote(nonce) + ',';
+        responseText += 'cnonce=' + this._quote(cnonce) + ',';
         responseText += 'nc="00000001",';
         responseText += 'qop="auth",';
-        responseText += 'digest-uri="' + digest_uri + '",';
-        responseText += 'response="' + hex_md5(hex_md5(A1) + ":" +
+        responseText += 'digest-uri=' + this._quote(digest_uri) + ',';
+        responseText += 'response=' + this._quote(hex_md5(hex_md5(A1) + ":" +
                                                nonce + ":00000001:" +
                                                cnonce + ":auth:" +
-                                               hex_md5(A2)) + '",';
+                                               hex_md5(A2))) + ',';
         responseText += 'charset="utf-8"';
 
         this._sasl_challenge_handler = this._addSysHandler(
@@ -2628,6 +2659,21 @@ Strophe.Connection.prototype = {
 
         return false;
     },
+
+    /** PrivateFunction: _quote
+     *  _Private_ utility function to backslash escape and quote strings.
+     *
+     *  Parameters:
+     *    (String) str - The string to be quoted.
+     *
+     *  Returns:
+     *    quoted string
+     */
+    _quote: function (str)
+    {
+        return '"' + str.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+    },
+
 
     /** PrivateFunction: _sasl_challenge2_cb
      *  _Private_ handler for second step of DIGEST-MD5 SASL authentication.
@@ -2818,6 +2864,9 @@ Strophe.Connection.prototype = {
                     this.send($iq({type: "set", id: "_session_auth_2"})
                                   .c('session', {xmlns: Strophe.NS.SESSION})
                                   .tree());
+                } else {
+                    this.authenticated = true;
+                    this._changeConnectStatus(Strophe.Status.CONNECTED, null);
                 }
             }
         } else {
@@ -3073,4 +3122,14 @@ Strophe.Connection.prototype = {
     }
 };
 
+if (callback) {
+    callback(Strophe, $build, $msg, $iq, $pres);
+}
 
+})(function () {
+    Strophe = arguments[0];
+    $build = arguments[1];
+    $msg = arguments[2];
+    $iq = arguments[3];
+    $pres = arguments[4];
+});
