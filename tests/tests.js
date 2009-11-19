@@ -80,6 +80,7 @@ $(document).ready(function () {
             conn.send(stanza);
         } catch (e) {}
         ok(conn._data.length === 1, "Output queue contains an element");
+        conn.reset();
     });
 
     test("send() does not accept strings", function () {
@@ -93,6 +94,7 @@ $(document).ready(function () {
         } catch (e) {
             equals(e.name, "StropheError", "send() should throw exception");
         }
+        conn.reset();
     });
 
     module("XML");
@@ -119,5 +121,6 @@ $(document).ready(function () {
         var output = conn._quote(input);
         equals(output, "\"\\\"beep \\\\40\\\"\"",
                "string should be quoted and escaped");
+        conn.reset();
     });
 });

@@ -4,3 +4,4 @@ ndproj
 doc
 .taperc
 plugins/*.min.js
+/.*.watchr.deps

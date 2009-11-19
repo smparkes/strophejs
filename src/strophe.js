@@ -413,7 +413,7 @@ Strophe = {
             } else if (typeof(arguments[a]) == "object") {
                 for (k in arguments[a]) {
                     if (arguments[a].hasOwnProperty(k)) {
-                        node.setAttribute(k, arguments[a][k]);
+                        node.setAttribute(k, arguments[a][k]+"");
                     }
                 } 
             }
@@ -3028,6 +3028,7 @@ Strophe.Connection.prototype = {
      */
     _onIdle: function ()
     {
+debug("on idle");
         var i, thand, since, newList;
 
         // remove timed handlers that have been scheduled for deletion
