@@ -413,7 +413,7 @@ Strophe = {
             } else if (typeof(arguments[a]) == "object") {
                 for (k in arguments[a]) {
                     if (arguments[a].hasOwnProperty(k)) {
-                        node.setAttribute(k, arguments[a][k]);
+                        node.setAttribute(k, arguments[a][k]+"");
                     }
                 } 
             }
@@ -1211,7 +1211,7 @@ Strophe.TimedHandler.prototype = {
  *    (Integer) sends - The number of times this same request has been
  *      sent.
  */
-Strophe.Request = function (elem, func, rid, sends)
+Strophe.Request = function (elem, func, rid, sends, target_window)
 {
     this.id = ++Strophe._requestId;
     this.xmlData = elem;
@@ -1235,7 +1235,7 @@ Strophe.Request = function (elem, func, rid, sends)
         var now = new Date();
         return (now - this.dead) / 1000;
     };
-    this.xhr = this._newXHR();
+    this.xhr = this._newXHR(target_window);
 };
 
 Strophe.Request.prototype = {
@@ -1281,16 +1281,16 @@ Strophe.Request.prototype = {
      *  Returns:
      *    A new XMLHttpRequest.
      */
-    _newXHR: function ()
+    _newXHR: function (target_window)
     {
         var xhr = null;
-        if (window.XMLHttpRequest) {
-            xhr = new XMLHttpRequest();
+        if (target_window.XMLHttpRequest) {
+            xhr = new target_window.XMLHttpRequest();
             if (xhr.overrideMimeType) {
                 xhr.overrideMimeType("text/xml");
             }
-        } else if (window.ActiveXObject) {
-            xhr = new ActiveXObject("Microsoft.XMLHTTP");
+        } else if (target_window.ActiveXObject) {
+            xhr = new target_window.ActiveXObject("Microsoft.XMLHTTP");
         }
 
         xhr.onreadystatechange = this.func.prependArg(this);
@@ -1330,8 +1330,9 @@ Strophe.Request.prototype = {
  *  Returns:
  *    A new Strophe.Connection object.
  */
-Strophe.Connection = function (service)
+Strophe.Connection = function (service, target_window)
 {
+    this.target_window = target_window || window
     /* The path to the httpbind service. */
     this.service = service;
     /* The connected JID. */
@@ -1375,10 +1376,6 @@ Strophe.Connection = function (service)
     this._sasl_success_handler = null;
     this._sasl_failure_handler = null;
     this._sasl_challenge_handler = null;
-
-    // setup onIdle callback every 1/10th of a second
-    this._idleTimeout = setTimeout(this._onIdle.bind(this), 100);
-
     // initialize plugins
     for (var k in Strophe._connectionPlugins) {
 	ptype = Strophe._connectionPlugins[k];
@@ -1423,6 +1420,11 @@ Strophe.Connection.prototype = {
 
         this._requests = [];
         this._uniqueId = Math.round(Math.random()*10000);
+
+        if (this._idleTimeout) {
+	    clearTimeout(this._idleTimeout);
+	}
+	this._idleTimeout = null;
     },
 
     /** Function: pause
@@ -1545,8 +1547,14 @@ Strophe.Connection.prototype = {
             new Strophe.Request(body.tree(),
                                 this._onRequestStateChange.bind(this)
                                     .prependArg(this._connect_cb.bind(this)),
-                                body.tree().getAttribute("rid")));
+                                body.tree().getAttribute("rid"),null,this.target_window));
         this._throttledRequestHandler();
+
+	// setup onIdle callback every 1/10th of a second
+        if (this._idleTimeout) {
+	    clearTimeout(this._idleTimeout);
+	}
+	this._idleTimeout = setTimeout(this._onIdle.bind(this), 100);
     },
 
     /** Function: attach
@@ -1575,6 +1583,12 @@ Strophe.Connection.prototype = {
 
         this.authenticated = true;
         this.connected = true;
+
+	// setup onIdle callback every 1/10th of a second
+        if (this._idleTimeout) {
+	    clearTimeout(this._idleTimeout);
+	}
+	this._idleTimeout = setTimeout(this._onIdle.bind(this), 100);
     },
 
     /** Function: xmlInput
@@ -1899,6 +1913,8 @@ Strophe.Connection.prototype = {
             this._disconnectTimeout = this._addSysTimedHandler(
                 3000, this._onDisconnectTimeout.bind(this));
             this._sendTerminate();
+        } else {
+          this.disconnecting = true;
         }
     },
 
@@ -2048,7 +2064,8 @@ Strophe.Connection.prototype = {
             this._requests[i] = new Strophe.Request(req.xmlData,
                                                     req.origFunc,
                                                     req.rid,
-                                                    req.sends);
+                                                    req.sends,
+						    this.target_window);
             req = this._requests[i];
         }
 
@@ -2063,7 +2080,7 @@ Strophe.Connection.prototype = {
                 Strophe.error("XHR open failed.");
                 if (!this.connected) {
                     this._changeConnectStatus(Strophe.Status.CONNFAIL,
-                                              "bad-service");
+                                              "bad-service:" + e);
                 }
                 this.disconnect();
                 return;
@@ -2275,6 +2292,11 @@ Strophe.Connection.prototype = {
         this.removeHandlers = [];
         this.addTimeds = [];
         this.addHandlers = [];
+
+        if (this._idleTimeout) {
+	    clearTimeout(this._idleTimeout);
+	}
+	this._idleTimeout = null;
     },
 
     /** PrivateFunction: _dataRecv
@@ -2387,7 +2409,7 @@ Strophe.Connection.prototype = {
         var req = new Strophe.Request(body.tree(),
                                       this._onRequestStateChange.bind(this)
                                           .prependArg(this._dataRecv.bind(this)),
-                                      body.tree().getAttribute("rid"));
+                                      body.tree().getAttribute("rid"),null,this.target_window);
 
         // abort and clear all waiting requests
         var r;
@@ -2779,11 +2801,11 @@ Strophe.Connection.prototype = {
 
         for (i = 0; i < elem.childNodes.length; i++) {
             child = elem.childNodes[i];
-            if (child.nodeName == 'bind') {
+            if (child.nodeName.toLowerCase() == 'bind') {
                 this.do_bind = true;
             }
 
-            if (child.nodeName == 'session') {
+            if (child.nodeName.toLowerCase() == 'session') {
                 this.do_session = true;
             }
         }
@@ -3006,6 +3028,7 @@ Strophe.Connection.prototype = {
      */
     _onIdle: function ()
     {
+debug("on idle");
         var i, thand, since, newList;
 
         // remove timed handlers that have been scheduled for deletion
@@ -3072,7 +3095,7 @@ Strophe.Connection.prototype = {
                 new Strophe.Request(body.tree(),
                                     this._onRequestStateChange.bind(this)
                                     .prependArg(this._dataRecv.bind(this)),
-                                    body.tree().getAttribute("rid")));
+                                    body.tree().getAttribute("rid"),null,this.target_window));
             this._processRequest(this._requests.length - 1);
         }
 
