@@ -1,3 +1,4 @@
+version.txt
 strophe.js
 strophe.min.js
 ndproj
@@ -5,3 +6,5 @@ doc
 .taperc
 plugins/*.min.js
 /.*.watchr.deps
+*.tar.gz
+*.zip
