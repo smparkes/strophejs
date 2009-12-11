@@ -682,6 +682,11 @@ Strophe = {
      */
     log: function (level, msg)
     {
+        if ( window.console && window.console.debug ) {
+            window.console.debug(level,msg);
+        } else if ( window.debug ) {
+            window.debug(level,msg);
+        }
         return;
     },
 
@@ -1911,6 +1916,10 @@ Strophe.Connection.prototype = {
         this.removeHandlers.push(handRef);
     },
 
+    abort: function() {
+        this._onDisconnectTimeout();
+    },
+
     /** Function: disconnect
      *  Start the graceful disconnection process.
      *
@@ -1930,6 +1939,7 @@ Strophe.Connection.prototype = {
         this._changeConnectStatus(Strophe.Status.DISCONNECTING, reason);
 
         Strophe.info("Disconnect was called because: " + reason);
+console.debug(this.connected);
         if (this.connected) {
             // setup timeout handler
             this._disconnectTimeout = this._addSysTimedHandler(
@@ -2282,6 +2292,8 @@ Strophe.Connection.prototype = {
                      ", number of errors: " + this.errors);
         if (this.errors > 4) {
             this._onDisconnectTimeout();
+        } else {
+          this._changeConnectStatus(Strophe.Status.CONNFAIL,reqStatus);
         }
     },
 
@@ -2301,7 +2313,7 @@ Strophe.Connection.prototype = {
         this.rid = Math.floor(Math.random() * 4294967295);
 
         // tell the parent we disconnected
-        if (this.connected) {
+        if (true || this.connected) {
             this._changeConnectStatus(Strophe.Status.DISCONNECTED, null);
             this.connected = false;
         }
@@ -3040,7 +3052,6 @@ Strophe.Connection.prototype = {
      */
     _onIdle: function ()
     {
-debug("on idle");
         var i, thand, since, newList;
 
         // remove timed handlers that have been scheduled for deletion
@@ -3147,3 +3158,9 @@ if (callback) {
     window.$iq = arguments[3];
     window.$pres = arguments[4];
 });
+
+// Local Variables:
+// espresso-indent-level:4
+// c-basic-offset:4
+// tab-width:4
+// End:
