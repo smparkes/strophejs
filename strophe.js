@@ -2473,8 +2473,8 @@ console.debug(this.connected);
             // Fires the XHR request -- may be invoked immediately
             // or on a gradually expanding retry window for reconnects
             var sendFunc = function () {
-              var x = req.xhr.send(req.data);
-console.debug("x",x,req.xhr.readyState);
+                var x = req.xhr.send(req.data);
+                // console.debug("x",x,req.xhr.readyState);
             };
 
             // Implement progressive backoff for reconnects --
