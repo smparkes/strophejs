@@ -542,7 +542,7 @@ Strophe = {
      *  The version of the Strophe library. Unreleased builds will have
      *  a version of head-HASH where HASH is a partial revision.
      */
-    VERSION: "802b946",
+    VERSION: "081107c",
 
     /** Constants: XMPP Namespace Constants
      *  Common namespace constants from the XMPP RFCs and XEPs.
@@ -1959,7 +1959,7 @@ Strophe.Connection.prototype = {
                                 body.tree().getAttribute("rid"),null,this.target_window));
         this._throttledRequestHandler();
 
-	// setup onIdle callback every 1/10th of a second
+	    // setup onIdle callback every 1/10th of a second
         if (this._idleTimeout) {
 	    clearTimeout(this._idleTimeout);
 	}
@@ -2004,9 +2004,9 @@ Strophe.Connection.prototype = {
 
 	    // setup onIdle callback every 1/10th of a second
         if (this._idleTimeout) {
-	        clearTimeout(this._idleTimeout);
-	    }
-	    this._idleTimeout = setTimeout(this._onIdle.bind(this), 100);
+	    clearTimeout(this._idleTimeout);
+	}
+	this._idleTimeout = setTimeout(this._onIdle.bind(this), 100);
 
         this.wait = wait || this.wait;
         this.hold = hold || this.hold;
@@ -2360,7 +2360,6 @@ Strophe.Connection.prototype = {
         this._changeConnectStatus(Strophe.Status.DISCONNECTING, reason);
 
         Strophe.info("Disconnect was called because: " + reason);
-console.debug(this.connected);
         if (this.connected) {
             // setup timeout handler
             this._disconnectTimeout = this._addSysTimedHandler(
@@ -3238,11 +3237,11 @@ console.debug(this.connected);
 
         for (i = 0; i < elem.childNodes.length; i++) {
             child = elem.childNodes[i];
-            if (child.nodeName.toLowerCase() == 'bind') {
+            if (child.nodeName == 'bind') {
                 this.do_bind = true;
             }
 
-            if (child.nodeName.toLowerCase() == 'session') {
+            if (child.nodeName == 'session') {
                 this.do_session = true;
             }
         }
@@ -3579,5 +3578,5 @@ if (callback) {
 // Local Variables:
 // espresso-indent-level:4
 // c-basic-offset:4
-// tab-width:4
+// tab-width:8
 // End:
