@@ -58,6 +58,10 @@ jazrb = lambda do |*args|
   end
 end
 
+watch( %r(src/.*.js$),  [ :load, :created, :modified ], nil, :batch => :src ) do |events|
+  system "make"
+end
+
 watch( %r(tests/.*.html$),  [ :load, :created, :modified ], nil, :batch => :html ) do |events|
   jazrb.call events
 end
