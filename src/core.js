@@ -1,3 +1,4 @@
+/* -*- tab-width: 4; c-basic-offset: 4; espresso-indent-level:4 -*- */
 /*
     This program is distributed under the terms of the MIT license.
     Please see the LICENSE file for details.
@@ -2037,9 +2038,12 @@ Strophe.Connection.prototype = {
             try {
                 this.connect_callback(status, condition);
             } catch (e) {
-                Strophe.error("User connection callback caused an " +
-                              "exception: " + e);
-                throw e;
+                var msg = "User connection callback caused an " +
+                           "exception: " + e;
+                if (e.stack) {
+                    msg = msg + "\n" + e.stack;
+                }
+                Strophe.error(msg);
             }
         }
     },
@@ -2534,10 +2538,18 @@ Strophe.Connection.prototype = {
         if (typ !== null && typ == "terminate") {
             // an error occurred
             cond = bodyWrap.getAttribute("condition");
-            conflict = bodyWrap.getElementsByTagName("conflict");
             if (cond !== null) {
-                if (cond == "remote-stream-error" && conflict.length > 0) {
-                    cond = "conflict";
+                if (cond == "remote-stream-error") {
+                    conflict = bodyWrap.getElementsByTagName("conflict");
+                    if (conflict.length>0) {
+                        cond = "conflict";
+                    } else {
+                        conflict =
+                            bodyWrap.getElementsByTagNameNS("http://etherx.jabber.org/streams","error");
+                        if (conflict.length>0) {
+                            cond = conflict[0].children[0].nodeName;
+                        }
+                    }
                 }
                 this._changeConnectStatus(Strophe.Status.CONNFAIL, cond);
             } else {
@@ -3211,9 +3223,3 @@ if (callback) {
     window.$iq = arguments[3];
     window.$pres = arguments[4];
 });
-
-// Local Variables:
-// espresso-indent-level:4
-// c-basic-offset:4
-// tab-width:8
-// End:
