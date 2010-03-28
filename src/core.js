@@ -2547,7 +2547,7 @@ Strophe.Connection.prototype = {
                         conflict =
                             bodyWrap.getElementsByTagNameNS("http://etherx.jabber.org/streams","error");
                         if (conflict.length>0) {
-                            cond = conflict[0].children[0].nodeName;
+                            cond = conflict[0].childNodes[0].nodeName;
                         }
                     }
                 }
@@ -3008,8 +3008,14 @@ Strophe.Connection.prototype = {
             this.deleteHandler(this._sasl_challenge_handler);
             this._sasl_challenge_handler = null;
         }
+        
+        var reason;
 
-        this._changeConnectStatus(Strophe.Status.AUTHFAIL, null);
+        if (elem.nodeName === "failure" && elem.namespaceURI === "urn:ietf:params:xml:ns:xmpp-sasl") {
+            reason = elem.childNodes[0] && elem.childNodes[0].nodeName;
+        }
+
+        this._changeConnectStatus(Strophe.Status.AUTHFAIL, reason || null);
         return false;
     },
 
